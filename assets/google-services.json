@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "918453499197",
+    "project_id": "crazyholidays",
+    "storage_bucket": "crazyholidays.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:918453499197:android:d7ee42c9eb081857d7c154",
+        "android_client_info": {
+          "package_name": "com.crazyholidays.tmanager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-43J72slvUFueCXfSR_GmAIwEwwF-nww"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
