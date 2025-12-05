@@ -28,7 +28,7 @@ export default function BottomTabs({ navigation }: any) {
   };
 
   const CustomTabBar = ({ state, descriptors, navigation }: any) => {
-    const tabNames = ["Dashboard", "Contact", "TourDetail", "Gallery", "Logout"];
+    const tabNames = ["Dashboard", "ManagerProfile", "TourDetail", "Gallery", "Logout"];
     const tabLabels = ["Dashboard", "Profile", "My Trip", "Tips", "Signout"];
     const tabIcons = ["home", "person", "public", "lightbulb", "logout"];
 

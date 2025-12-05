@@ -11,7 +11,7 @@ export default function ContactScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tour Manager</Text>
+        <Text style={styles.headerTitle}>Contact Details</Text>
         <Ionicons name="person-circle-outline" size={26} color="#000" />
       </View>
 

@@ -50,18 +50,13 @@ function CustomDrawerContent(props: any) {
           label="Active Trip"
           onPress={() => navigation.navigate("TourDetail", { userId: user.userId })}
         />
-        <DrawerItem label="Tour Tips" onPress={() => {}} />
         <DrawerItem
           label="Important Contacts"
           onPress={() => navigation.navigate("Contact")}
         />
         <DrawerItem
-          label="Gallery"
-          onPress={() => navigation.navigate("Gallery")}
-        />
-        <DrawerItem
-          label="Manager Profile"
-          onPress={() => navigation.navigate("ManagerProfile")}
+          label="My Profile"
+          onPress={() => navigation.navigate("ManagerProfile", { userId: user.userId })}
         />
         <DrawerItem label="Logout" onPress={handleLogout} />
       </View>

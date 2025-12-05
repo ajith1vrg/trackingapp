@@ -119,7 +119,7 @@ export default function DashboardScreen() {
                   <Ionicons name="list-outline" size={35} color="#555" />
                   <Text style={styles.tourBtnText}>Details</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.tourBtn} onPress={() => navigation.navigate("LocationTracker")}>
+                <TouchableOpacity style={styles.tourBtn} onPress={() => navigation.navigate("LocationTracker", { userId } as any)}>
                   <Ionicons name="map-outline" size={35} color="#555" />
                   <Text style={styles.tourBtnText}>View Map</Text>
                 </TouchableOpacity>

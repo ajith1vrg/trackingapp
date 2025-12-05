@@ -69,7 +69,7 @@ export default function TourDetailScreen({ route, navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={26} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tour Manager</Text>
+        <Text style={styles.headerTitle}>Trip Details</Text>
         <Ionicons name="person-circle-outline" size={28} color="#000" />
       </View>
 
@@ -77,8 +77,8 @@ export default function TourDetailScreen({ route, navigation }: any) {
       <View style={styles.section}>
         <Text style={styles.tripName}>{tour?.trip_name || "Tour Name"}</Text>
         <Text style={styles.date}>
-          {tour?.trip_date || "13/08/2025 6:00 AM"} to{" "}
-          {tour?.trip_end_date || "13/08/2025 6:00 PM"}
+          {tour?.trip_date || ""} to{" "}
+          {tour?.trip_end_date || ""}
         </Text>
 
         <View style={styles.infoRow}>
