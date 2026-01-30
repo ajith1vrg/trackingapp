@@ -17,6 +17,10 @@ import TourDetailScreen from "../screens/TourDetailScreen";
 import ContactScreen from "../screens/ContactScreen";
 import ManagerProfileScreen from "../screens/ManagerProfileScreen";
 import LocationTracker from "../screens/LocationTracker";
+import SavedLocations from "../screens/SavedLocations";
+import TrackMap from "../screens/TrackMap";
+import AppTipsScreen from "../screens/AppTips";
+import { logoutAPI } from "../components/logoutApi";
 
 const Drawer = createDrawerNavigator();
 
@@ -25,11 +29,48 @@ function CustomDrawerContent(props: any) {
   const user = useSelector((state: RootState) => state.user);
   const { navigation } = props;
 
-  const handleLogout = () => {
-    dispatch(clearUser());
-    Toast.show({ type: "success", text1: "Logged out" });
-    navigation.reset({ index: 0, routes: [{ name: "Login" }] });
-  };
+  const handleLogout = async () => {
+    try {
+      Toast.show({
+        type: "info",
+        text1: "Logging out...",
+      });
+  
+      // 🔹 API call
+      if (user?.userId) {
+        await logoutAPI(String(user.userId));
+      }
+  
+        // 🔹 Clear redux
+        dispatch(clearUser());
+  
+        Toast.show({
+          type: "success",
+          text1: "Logged out successfully",
+        });
+  
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Login" }],
+        });
+  
+      } catch (error: any) {
+        console.log("Logout error:", error);
+  
+        Toast.show({
+          type: "error",
+          text1: "Logout failed",
+          text2: "Please try again",
+        });
+  
+        // Optional: still logout locally
+        dispatch(clearUser());
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Login" }],
+        });
+      }
+    };
 
   return (
     <DrawerContentScrollView
@@ -38,7 +79,7 @@ function CustomDrawerContent(props: any) {
     >
       <View>
         <Text style={styles.greeting}>
-          Hi, {user.user_name || "Tour Manager"}
+          Hi, {user.username || "Tour Manager"}
         </Text>
 
         {/* ✅ Drawer Links */}
@@ -53,6 +94,14 @@ function CustomDrawerContent(props: any) {
         <DrawerItem
           label="Important Contacts"
           onPress={() => navigation.navigate("Contact")}
+        />
+        <DrawerItem
+          label="Saved Locations"
+          onPress={() => navigation.navigate("SavedLocations")}
+        />
+        <DrawerItem
+          label="Track Your Way"
+          onPress={() => navigation.navigate("TrackMap")}
         />
         <DrawerItem
           label="My Profile"
@@ -74,20 +123,28 @@ function CustomDrawerContent(props: any) {
 }
 
 export default function DrawerNavigator() {
+  const isLoggedIn = useSelector(
+    (state: RootState) => !!state.user.userId
+  );
+
+  if (!isLoggedIn) {
+    return null; // or loading screen
+  }
+  
   return (
     <Drawer.Navigator
       drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{
-        headerShown: false,
-      }}
+      screenOptions={{ headerShown: false }}
     >
-      {/* ✅ Bottom Tabs now inside Drawer */}
+      {/* Bottom Tabs */}
       <Drawer.Screen name="HomeTabs" component={BottomTabs} />
 
-      {/* ✅ Other screens still accessible directly */}
+      {/* Other screens */}
       <Drawer.Screen name="Gallery" component={GalleryScreen} />
       <Drawer.Screen name="TourDetail" component={TourDetailScreen} />
       <Drawer.Screen name="Contact" component={ContactScreen} />
+      <Drawer.Screen name="SavedLocations" component={SavedLocations} />
+      <Drawer.Screen name="TrackMap" component={TrackMap} />
       <Drawer.Screen name="ManagerProfile" component={ManagerProfileScreen} />
       <Drawer.Screen name="LocationTracker" component={LocationTracker} />
     </Drawer.Navigator>

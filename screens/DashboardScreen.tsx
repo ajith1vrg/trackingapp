@@ -72,20 +72,20 @@ export default function DashboardScreen() {
         } else {
           // ✅ fallback to dummy data if no trip data
           setTourData({
-            trip_name: "Sample School Educational Tour",
-            customer_name: "Demo Institute, Wonderland",
-            trip_date: "01/01/2025 8:00 AM - 01/01/2025 6:00 PM",
+            trip_name: "",
+            customer_name: "",
+            trip_date: "",
           });
-          Toast.show({ type: "info", text1: "No Active Trip", text2: "Showing demo tour information." });
+          Toast.show({ type: "info", text1: "No Active Trip", text2: "No Information Available." });
         }
       } catch (error) {
         console.error("TourProfile Error:", error);
         Toast.show({ type: "error", text1: "Error", text2: "Something went wrong" });
         // ✅ also show dummy tour if API fails
         setTourData({
-          trip_name: "Sample School Educational Tour",
-          customer_name: "Demo Institute, Wonderland",
-          trip_date: "01/01/2025 8:00 AM - 01/01/2025 6:00 PM",
+          trip_name: "",
+          customer_name: "",
+          trip_date: "",
         });
       } finally {
         setLoading(false);
@@ -98,7 +98,7 @@ export default function DashboardScreen() {
   return (
     <View style={styles.container}>
       <AppHeader title="Dashboard" onMenuPress={() => navigation.toggleDrawer()} />
-      <Text style={styles.sectionTitle}>Your Trip</Text>
+      <Text style={styles.sectionTitle}>Welcome</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#f4b400" />
@@ -116,15 +116,15 @@ export default function DashboardScreen() {
                     navigation.navigate("TourDetail", { userId } as any)
                   }
                 >
-                  <Ionicons name="list-outline" size={35} color="#555" />
+                  <Ionicons name="list-outline" size={20} color="#555" />
                   <Text style={styles.tourBtnText}>Details</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.tourBtn} onPress={() => navigation.navigate("LocationTracker", { userId } as any)}>
-                  <Ionicons name="map-outline" size={35} color="#555" />
+                  <Ionicons name="map-outline" size={20} color="#555" />
                   <Text style={styles.tourBtnText}>View Map</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.tourBtn} onPress={() => navigation.navigate("Gallery" as never)}>
-                  <Ionicons name="image-outline" size={35} color="#555" />
+                  <Ionicons name="image-outline" size={20} color="#555" />
                   <Text style={styles.tourBtnText}>Photos</Text>
                 </TouchableOpacity>
               </View>
@@ -160,13 +160,13 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", paddingHorizontal: 20, paddingVertical: 40 },
-  sectionTitle: { fontSize: 18, fontWeight: "bold", marginVertical: 14, color: "#000" },
-  tourCard: { backgroundColor: "#fff", borderRadius: 10, padding: 18, borderWidth: 1, borderColor: "#ddd", marginBottom: 24 },
-  tourTitle: { fontSize: 18, fontWeight: "bold", color: "#000" },
+  sectionTitle: { fontSize: 28, fontWeight: "bold", marginVertical: 14, color: "#000" },
+  tourCard: { backgroundColor: "#fff", borderRadius: 10, paddingHorizontal: 18, paddingTop:14, paddingBottom:15, borderWidth: 1, borderColor: "#ddd", marginBottom: 15 },
+  tourTitle: { fontSize: 18, fontWeight: "bold", color: "#000", textTransform:"capitalize" },
   tourSub: { fontSize: 15, color: "#555", marginTop: 3 },
   tourDate: { fontSize: 14, color: "#666", marginTop: 8 },
-  tourActions: { flexDirection: "row", marginTop: 12, justifyContent: "space-around" },
-  tourBtn: { alignItems: "center" },
+  tourActions: { flexDirection: "row", marginTop: 12, marginHorizontal:-18, justifyContent: "space-around", borderTopWidth:1, paddingTop:12, borderTopColor:"#e0e0e0ff" },
+  tourBtn: { alignItems: "center", flexDirection:"row", gap:8 },
   tourBtnText: { fontSize: 13, color: "#555", marginTop: 2 },
   quickGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginTop: 12 },
   quickBtn: { width: "48%", aspectRatio: 1, borderRadius: 12, overflow: "hidden", marginBottom: 16, justifyContent: "center", alignItems: "center" },

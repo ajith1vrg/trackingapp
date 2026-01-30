@@ -7,15 +7,14 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-
-    "updates": { "fallbackToCacheTimeout": 0 },
-
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-
     "plugins": [
       "expo-sqlite",
       [
@@ -29,13 +28,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.crazyholidays.tmanager",
       "googleServicesFile": "./assets/GoogleService-Info.plist",
-      "config": {
-        "googleMapsApiKey": "AIzaSyD161ugLZJT_E6tG2uuXaVRvBpl55NyGn8"
-      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We track your location for route monitoring.",
         "NSLocationAlwaysUsageDescription": "We use your location even when app is closed.",
-        "UIBackgroundModes": ["location", "fetch"],
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -46,32 +45,29 @@
         "backgroundColor": "#ffffff"
       },
       "googleServicesFile": "./assets/google-services.json",
-
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS"
       ],
-      "foregroundService": {
-        "notificationTitle": "Location Tracking Active",
-        "notificationBody": "Tracking running even in background.",
-        "notificationColor": "#2196F3"
-      },
-
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyD161ugLZJT_E6tG2uuXaVRvBpl55NyGn8"
         }
       }
     },
-
-    "web": { "favicon": "./assets/favicon.png" },
-
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "extra": {
-      "eas": { "projectId": "46303191-0ed4-4c5a-bc74-2ed9cc132092" },
-      "googleMapsApiKey": "AIzaSyD161ugLZJT_E6tG2uuXaVRvBpl55NyGn8"
-    }
+      "googleMapsApiKey": "AIzaSyD161ugLZJT_E6tG2uuXaVRvBpl55NyGn8",
+      "eas": {
+        "projectId": "081ae8a2-273c-4582-bfe9-2738b32961bd"
+      }
+    },
+    "owner": "crazy-holidays"
   }
 }

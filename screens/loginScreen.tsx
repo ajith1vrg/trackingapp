@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -15,21 +15,22 @@ import * as Yup from "yup";
 import Toast from "react-native-toast-message";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useDispatch } from "react-redux";
-import { setLogin, setProfile } from "../userSlice";
+import { useDispatch, useSelector } from "react-redux";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
+import { setLogin, setProfile } from "../userSlice";
+import { RootState } from "../store";
 import { getFCMToken } from "./notifications";
 
 const { width } = Dimensions.get("window");
 
-// Stack screens
 type RootStackParamList = {
   Login: undefined;
   AppDrawer: undefined;
 };
 
-// Typed navigation prop for LoginScreen
-type LoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Login">;
+type LoginScreenNavigationProp =
+  NativeStackNavigationProp<RootStackParamList, "Login">;
 
 const LoginSchema = Yup.object().shape({
   username: Yup.string().required("Username is required"),
@@ -37,44 +38,64 @@ const LoginSchema = Yup.object().shape({
 });
 
 export default function LoginScreen() {
-  const [showPassword, setShowPassword] = useState(false);
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.user);
 
-  const handleLogin = async (values: { username: string; password: string }) => {
-    const fcmid = await getFCMToken();
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (user?.userId) {
+      navigation.replace("AppDrawer");
+    }
+  }, [user?.userId]);
+
+  const handleLogin = async (values: {
+    username: string;
+    password: string;
+  }) => {
     try {
+      // 🔑 Get FCM token (optional)
+      const fcmToken = (await getFCMToken()) ?? "NA";
+
       const payload = {
-      username: values.username,
-      password: values.password,
-      fcmid: fcmid, // constant value
-    };
-      // ---------------------------
-      // 🚀 REAL LOGIN API (uncomment when ready)
-      // ---------------------------
-      const response = await fetch("https://crazyholidays.in/api/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json", // tell server we send JSON
-      },
-      body: JSON.stringify(payload), // convert object → JSON string
-    });
+        username: values.username.trim(),
+        password: values.password,
+        fcmid: fcmToken, // NEVER null now
+      };
+
+      const response = await fetch(
+        "https://crazyholidays.in/api/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await response.json();
-      console.log("Login API Response:", data);
-      if (data.status && data.status.toString() === "true") {
-        dispatch(setLogin({ userId: data.userid.toString(), username: values.username }));
 
-        const profileRes = await fetch(`https://crazyholidays.in/api/profile/${data.userid}`);
+      if (data?.status?.toString() === "true") {
+        dispatch(
+          setLogin({
+            userId: data.userid.toString(),
+            username: values.username,
+          })
+        );
+
+        // Fetch profile
+        const profileRes = await fetch(
+          `https://crazyholidays.in/api/profile/${data.userid}`
+        );
         const profileData = await profileRes.json();
 
-        if (profileData.status && profileData.status.toString() === "true") {
+        if (profileData?.status?.toString() === "true") {
           dispatch(
             setProfile({
-              tripCode: profileData.trip_code?.toString() || "",
-              userName: profileData.user_name || "",
-              vehicleNo: profileData.vechicle_no || "",
-              phoneNo: profileData.phone_no || "",
+              tripCode: profileData.trip_code ?? "",
+              userName: profileData.user_name ?? "",
+              vehicleNo: profileData.vechicle_no ?? "",
+              phoneNo: profileData.phone_no ?? "",
               isStart: profileData.is_start === 1,
             })
           );
@@ -91,15 +112,15 @@ export default function LoginScreen() {
         Toast.show({
           type: "error",
           text1: "Login Failed",
-          text2: data.msg || "Please try again",
+          text2: data?.msg || "Invalid credentials",
         });
       }
     } catch (error) {
-      console.error("Login/Profile Error:", error);
+      console.log("Login error:", error);
       Toast.show({
         type: "error",
         text1: "Error",
-        text2: "Something went wrong",
+        text2: "Unable to login. Please try again.",
       });
     }
   };
@@ -109,41 +130,42 @@ export default function LoginScreen() {
       contentContainerStyle={styles.container}
       enableOnAndroid
       extraScrollHeight={180}
-      enableAutomaticScroll
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.topImageHolder}>
         <Image
           source={require("../assets/Crazy-login-bg.png")}
           style={styles.topImage}
-          resizeMode="cover"
         />
         <Image
           source={require("../assets/login_border.png")}
           style={styles.borderImage}
-          resizeMode="contain"
         />
       </View>
 
       <Formik
         initialValues={{ username: "", password: "" }}
         validationSchema={LoginSchema}
-        onSubmit={(values) => handleLogin(values)}
+        onSubmit={handleLogin}
       >
-        {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
+        {({
+          handleChange,
+          handleBlur,
+          handleSubmit,
+          values,
+          errors,
+          touched,
+        }) => (
           <View style={styles.bottomSheet}>
             <Image
               source={require("../assets/Crazy-logo.png")}
               style={styles.logo}
-              resizeMode="contain"
             />
             <Text style={styles.subtitle}>Tour Manager Login</Text>
 
-            {/* Username */}
             <TextInput
               style={styles.input}
               placeholder="Enter Username"
-              placeholderTextColor="#888"
               value={values.username}
               onChangeText={handleChange("username")}
               onBlur={handleBlur("username")}
@@ -152,12 +174,10 @@ export default function LoginScreen() {
               <Text style={styles.errorText}>{errors.username}</Text>
             )}
 
-            {/* Password */}
             <View style={styles.passwordWrapper}>
               <TextInput
                 style={styles.passwordInput}
                 placeholder="Enter Password"
-                placeholderTextColor="#888"
                 secureTextEntry={!showPassword}
                 value={values.password}
                 onChangeText={handleChange("password")}
@@ -165,7 +185,6 @@ export default function LoginScreen() {
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeButton}
               >
                 <Ionicons
                   name={showPassword ? "eye-off" : "eye"}
@@ -174,18 +193,14 @@ export default function LoginScreen() {
                 />
               </TouchableOpacity>
             </View>
+
             {touched.password && errors.password && (
               <Text style={styles.errorText}>{errors.password}</Text>
             )}
 
-            {/* Login Button */}
             <Pressable style={styles.loginBtn} onPress={() => handleSubmit()}>
               <Text style={styles.loginText}>LOGIN</Text>
             </Pressable>
-
-            <Text style={styles.forgotText}>
-              Forgot Password? <Text style={styles.link}>Request New</Text>
-            </Text>
           </View>
         )}
       </Formik>
@@ -196,20 +211,23 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: "#fff", paddingBottom: 80 },
-  topImageHolder: { width: "100%", height: "40%", position: "relative" },
+  container: { flexGrow: 1, backgroundColor: "#fff" },
+  topImageHolder: { height: "40%" },
   topImage: { width: "100%", height: "100%" },
   borderImage: { position: "absolute", bottom: -5, width: "100%", height: 60 },
-  bottomSheet: { backgroundColor: "#fff", alignItems: "center", paddingHorizontal: 20, paddingVertical: 40, width: "100%" },
-  logo: { width: width * 0.5, height: 80, marginBottom: 10 },
-  subtitle: { fontSize: 20, fontWeight: "bold", marginBottom: 25, color: "#000" },
-  input: { width: "100%", borderBottomWidth: 1, borderBottomColor: "#ccc", paddingVertical: 12, marginBottom: 12, fontSize: 16, color: "#000" },
-  passwordWrapper: { width: "100%", flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#ccc", paddingVertical: 10, marginBottom: 12 },
-  passwordInput: { flex: 1, fontSize: 16, color: "#000", paddingVertical: 0 },
-  eyeButton: { paddingHorizontal: 8, justifyContent: "center", alignItems: "center" },
-  errorText: { width: "100%", fontSize: 12, color: "red", marginBottom: 8 },
-  loginBtn: { width: "100%", backgroundColor: "#f4b400", paddingVertical: 15, borderRadius: 8, alignItems: "center", marginTop: 10 },
-  loginText: { color: "#000", fontWeight: "bold", fontSize: 16 },
-  forgotText: { marginTop: 20, fontSize: 14, color: "#333" },
-  link: { color: "#f4b400", fontWeight: "bold" },
+  bottomSheet: { padding: 20, alignItems: "center" },
+  logo: { width: width * 0.5, height: 80 },
+  subtitle: { fontSize: 20, fontWeight: "bold", marginBottom: 20 },
+  input: { width: "100%", borderBottomWidth: 1, marginBottom: 10 },
+  passwordWrapper: { flexDirection: "row", borderBottomWidth: 1 },
+  passwordInput: { flex: 1 },
+  errorText: { color: "red", fontSize: 12 },
+  loginBtn: {
+    backgroundColor: "#f4b400",
+    paddingVertical: 14,
+    width: "100%",
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  loginText: { textAlign: "center", fontWeight: "bold" },
 });

@@ -8,7 +8,9 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native";
+import { useSelector } from "react-redux";
 import { Ionicons } from "@expo/vector-icons";
+import { RootState } from "../store";
 
 type ProfileData = {
   user_name?: string;
@@ -19,7 +21,8 @@ type ProfileData = {
 };
 
 export default function ManagerProfileScreen({ route, navigation }: any) {
-  const { userId } = route.params ?? {};
+  const userId = useSelector((state: RootState) => state.user.userId);
+  //const { userId } = route.params ?? {};
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileData | null>(null);
 

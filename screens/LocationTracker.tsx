@@ -1,450 +1,239 @@
-// TrackingScreen.js
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
-  Button,
-  Alert,
-  Switch,
-  FlatList,
-  Platform,
   StyleSheet,
+  ActivityIndicator,
+  Button,
+  Switch,
+  Alert,
+  Platform,
+  TouchableOpacity,
 } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
-import * as TaskManager from "expo-task-manager";
-import * as SQLite from "expo-sqlite";
-import KalmanFilter from "kalmanjs";
+import * as Notifications from "expo-notifications";
+import { Ionicons } from "@expo/vector-icons";
 
-/* ----------------------- CONFIG ----------------------- */
-const LOCATION_TASK = "LOCATION_TASK_V1";
-const API_URL = "https://kareva.co.in/apicrazy/insert.php";
+import { initDB, saveLocation } from "./db";
+import { BACKGROUND_LOCATION_TASK } from "./BackgroundTask";
+import { setBackToSchoolFlag } from "./TrackingState";
+import { sendLocationToAPI } from "./locationAPI";
 
-/* -------------------- Globals for background -------------------- */
-let globalUserId = null;
-let globalBackToSchool = false;
-
-/* -------------------- Persistent Kalman filters -------------------- */
-const kfLat = new KalmanFilter({ R: 0.01, Q: 3 });
-const kfLng = new KalmanFilter({ R: 0.01, Q: 3 });
-
-/* -------------------- SQLite Helpers -------------------- */
-async function openDb() {
-  if (SQLite.openDatabaseAsync) {
-    return SQLite.openDatabaseAsync("trackdata.db");
-  }
-
-  const db = SQLite.openDatabase("trackdata.db");
-
-  // Add promise helpers if needed
-  if (!db.execAsync) {
-    db.execAsync = (sql) =>
-      new Promise((resolve, reject) =>
-        db.exec([{ sql, args: [] }], false, (_, result) =>
-          result ? resolve(result) : reject(result)
-        )
-      );
-  }
-  if (!db.runAsync) {
-    db.runAsync = (sql, ...args) =>
-      new Promise((resolve, reject) =>
-        db.exec([{ sql, args }], false, (tx, result) =>
-          result ? resolve(result) : reject(result)
-        )
-      );
-  }
-  if (!db.getAllAsync) {
-    db.getAllAsync = (sql, ...args) =>
-      new Promise((resolve, reject) =>
-        db.readTransaction(
-          (tx) =>
-            tx.executeSql(
-              sql,
-              args,
-              (_, { rows }) => resolve(rows._array),
-              (_, err) => reject(err)
-            ),
-          (err) => reject(err)
-        )
-      );
-  }
-
-  return db;
-}
-
-/* -------------------- BACKGROUND TASK -------------------- */
-TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
-  try {
-    console.log("[BG] TASK RUN", new Date().toISOString());
-
-    if (error) {
-      console.log("[BG] Task error:", error);
-      return;
-    }
-
-    if (!data || !data.locations || data.locations.length === 0) {
-      console.log("[BG] Empty payload");
-      return;
-    }
-
-    const loc = data.locations[0];
-
-    // ⛔ Prevent "Cannot convert undefined value to object"
-    if (!loc || !loc.coords || typeof loc.coords.latitude !== "number") {
-      console.log("[BG] Invalid coords:", loc);
-      return;
-    }
-
-    // Raw coordinates
-    let latitude = loc.coords.latitude;
-    let longitude = loc.coords.longitude;
-
-    // Kalman smoothing (persistent internal state)
-    latitude = kfLat.filter(latitude);
-    longitude = kfLng.filter(longitude);
-
-    const timestamp = new Date(loc.timestamp || Date.now()).toISOString();
-
-    const db = await openDb();
-
-    // Tables always exist
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS locations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        userId INTEGER,
-        latitude REAL,
-        longitude REAL,
-        timestamp TEXT,
-        isBackToSchool INTEGER DEFAULT 0
-      );
-    `);
-
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS pending_uploads (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        payload TEXT,
-        created_at TEXT
-      );
-    `);
-
-    // Insert
-    await db.runAsync(
-      "INSERT INTO locations (userId, latitude, longitude, timestamp, isBackToSchool) VALUES (?, ?, ?, ?, ?)",
-      globalUserId ?? 0,
-      latitude,
-      longitude,
-      timestamp,
-      globalBackToSchool ? 1 : 0
-    );
-
-    console.log("[BG] Saved:", latitude, longitude);
-
-    // Upload attempt
-    try {
-      await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: globalUserId ?? 0,
-          latitude,
-          longitude,
-          IsBackToSchool: globalBackToSchool ? 1 : 0,
-        }),
-      });
-
-      console.log("[BG] Upload OK");
-    } catch (uploadErr) {
-      console.log("[BG] Upload failed, saving pending");
-
-      const payload = JSON.stringify({
-        userId: globalUserId ?? 0,
-        latitude,
-        longitude,
-        IsBackToSchool: globalBackToSchool ? 1 : 0,
-      });
-
-      await db.runAsync(
-        "INSERT INTO pending_uploads (payload, created_at) VALUES (?, ?)",
-        payload,
-        timestamp
-      );
-    }
-  } catch (crash) {
-    console.log("[BG] FATAL ERROR:", crash);
-  }
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
 });
 
-/* -------------------- SCREEN -------------------- */
-export default function TrackingScreen({ route, navigation }) {
+export default function SimpleMapScreen({ route, navigation }: any) {
   const { userId } = route.params ?? {};
 
-  const [coords, setCoords] = useState([]);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [tracking, setTracking] = useState(false);
-  const [isBackToSchool, setIsBackToSchool] = useState(false);
-  const [dbInstance, setDbInstance] = useState(null);
+  const [backToSchool, setBackToSchool] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const mapRef = useRef(null);
+  const mapRef = useRef<MapView | null>(null);
+  const fgSubscription = useRef<Location.LocationSubscription | null>(null);
 
-  /* Init DB & load UI data */
-  useEffect(() => {
-    (async () => {
-      const db = await openDb();
-      setDbInstance(db);
+ useEffect(() => {
+  initDB();
+  requestNotificationPermission();
+  loadInitialLocation();
 
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS locations (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          userId INTEGER,
-          latitude REAL,
-          longitude REAL,
-          timestamp TEXT,
-          isBackToSchool INTEGER DEFAULT 0
-        );
-      `);
+  return () => {
+    stopTracking(); // ✅ call async fn, don't return it
+  };
+}, []);
 
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS pending_uploads (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          payload TEXT,
-          created_at TEXT
-        );
-      `);
+  const requestNotificationPermission = async () => {
+    await Notifications.requestPermissionsAsync();
+  };
 
-      await loadCoords(db);
-    })();
+  const loadInitialLocation = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") return;
 
-    // Poll DB every 5 seconds for UI updates
-    const poll = setInterval(() => {
-      if (dbInstance) loadCoords(dbInstance);
-    }, 5000);
-
-    TaskManager.isTaskRegisteredAsync(LOCATION_TASK).then((reg) => {
-      setTracking(reg);
+    const loc = await Location.getCurrentPositionAsync({});
+    setLocation({
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
     });
+  };
 
-    return () => clearInterval(poll);
-  }, [dbInstance]);
+  // ---------------- TRACKING ----------------
 
-  /* auto-center map */
-  useEffect(() => {
-    if (coords.length > 0 && mapRef.current) {
-      const last = coords[coords.length - 1];
-      mapRef.current.animateToRegion(
-        {
-          latitude: last.latitude,
-          longitude: last.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        },
-        600
-      );
+  const startTracking = async () => {
+    setLoading(true);
+
+    const fg = await Location.requestForegroundPermissionsAsync();
+    const bg = await Location.requestBackgroundPermissionsAsync();
+
+    if (fg.status !== "granted") {
+      Alert.alert("Permission required", "Location permission needed");
+      setLoading(false);
+      return;
     }
-  }, [coords]);
 
-  /* load coords */
-  async function loadCoords(db) {
-    try {
-      const d = db || dbInstance;
-      if (!d) return;
+    setTracking(true);
 
-      const rows = await d.getAllAsync(
-        "SELECT id, userId, latitude, longitude, timestamp, isBackToSchool FROM locations ORDER BY id ASC"
-      );
-
-      const normalized = rows.map((r) => ({
-        ...r,
-        timestamp: r.timestamp || new Date().toISOString(),
-      }));
-
-      setCoords(normalized);
-
-      await flushPendingUploads(d);
-    } catch (e) {
-      console.warn("[UI] loadCoords error:", e);
-    }
-  }
-
-  /* flush pending uploads */
-  async function flushPendingUploads(db) {
-    try {
-      const pending = await db.getAllAsync(
-        "SELECT id, payload FROM pending_uploads ORDER BY id ASC LIMIT 20"
-      );
-
-      if (!pending.length) return;
-
-      for (const p of pending) {
-        try {
-          const body = JSON.parse(p.payload);
-          await fetch(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-
-          await db.runAsync("DELETE FROM pending_uploads WHERE id = ?", p.id);
-          console.log("[UI] flushed pending:", p.id);
-        } catch (err) {
-          console.log("[UI] flush failed:", err);
-          break;
-        }
-      }
-    } catch (err) {
-      console.warn("[UI] flush error:", err);
-    }
-  }
-
-  /* start tracking */
-  async function startTracking() {
-    try {
-      const fg = await Location.requestForegroundPermissionsAsync();
-      if (fg.status !== "granted") {
-        Alert.alert("Permission needed", "Foreground location required.");
-        return;
-      }
-
-      const bg = await Location.requestBackgroundPermissionsAsync();
-      if (bg.status !== "granted") {
-        Alert.alert("Permission needed", "Enable 'Allow all the time'.");
-        return;
-      }
-
-      globalUserId = userId ?? 0;
-      globalBackToSchool = isBackToSchool;
-
-      const options = {
-        accuracy: Location.Accuracy.Highest,
-        timeInterval: 10000,
-        distanceInterval: 1,
-        pausesUpdatesAutomatically: false,
-        showsBackgroundLocationIndicator: Platform.OS === "ios",
-        deferredUpdatesInterval: 10000,
-        deferredUpdatesDistance: 1,
-        foregroundService: {
-          notificationTitle: "Route Tracking Active",
-          notificationBody: "Tracking in background...",
-          notificationColor: "#00aaff",
-        },
-      };
-
-      await Location.startLocationUpdatesAsync(LOCATION_TASK, options);
-
-      const reg = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK);
-      setTracking(reg);
-
-      if (dbInstance) await loadCoords(dbInstance);
-    } catch (err) {
-      Alert.alert("Error", err.message);
-    }
-  }
-
-  /* stop tracking */
-  async function stopTracking() {
-    const reg = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK);
-    if (reg) await Location.stopLocationUpdatesAsync(LOCATION_TASK);
-    setTracking(false);
-  }
-
-  /* clear DB */
-  async function clearData() {
-    if (!dbInstance) return;
-    Alert.alert("Confirm", "Delete all points?", [
-      { text: "Cancel" },
+    // 🔹 Foreground live tracking
+    fgSubscription.current = await Location.watchPositionAsync(
       {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          await dbInstance.execAsync("DELETE FROM locations");
-          await dbInstance.execAsync("DELETE FROM pending_uploads");
-          setCoords([]);
-        },
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 30000,
+        distanceInterval: 0,
       },
-    ]);
-  }
+      (loc) => {
+        const coords = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        };
 
-  /* toggle */
-  function onToggleBackToSchool(v) {
-    setIsBackToSchool(v);
-    globalBackToSchool = v;
-  }
+        setLocation(coords);
+        saveLocation(coords.latitude, coords.longitude, backToSchool ? 1 : 0);
+        sendLocationToAPI(userId, coords.latitude, coords.longitude, backToSchool);
+
+        mapRef.current?.animateToRegion(
+          {
+            ...coords,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          },
+          800
+        );
+      }
+    );
+
+    // 🔹 Background tracking
+    if (bg.status === "granted") {
+      const running = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+      if (!running) {
+        await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 30000,
+          distanceInterval: 0,
+          showsBackgroundLocationIndicator: true,
+          foregroundService: {
+            notificationTitle: "Tracking location",
+            notificationBody: "Background tracking active",
+          },
+        });
+      }
+    }
+
+    setLoading(false);
+  };
+
+  const stopTracking = async () => {
+    setTracking(false);
+
+    fgSubscription.current?.remove();
+    fgSubscription.current = null;
+
+    const running = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+    if (running) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+
+    if (Platform.OS !== "web") {
+      Alert.alert("Tracking stopped", "Location tracking turned off");
+    }
+  };
+
+  const toggleTracking = () => {
+    tracking ? stopTracking() : startTracking();
+  };
+
+  const handleBackToSchoolChange = (val: boolean) => {
+    setBackToSchool(val);
+    setBackToSchoolFlag(val ? 1 : 0);
+  };
+
+  // ---------------- UI ----------------
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
+      {/* Back button */}
+      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <Ionicons name="arrow-back" size={26} color="#000" />
+      </TouchableOpacity>
+
+      {/* Map (50% height) */}
       <MapView
         ref={mapRef}
-        style={{ height: 380 }}
+        style={styles.map}
         showsUserLocation
         initialRegion={{
-          latitude: coords[0]?.latitude || 10,
-          longitude: coords[0]?.longitude || 76,
+          latitude: location?.latitude ?? 10.8505,
+          longitude: location?.longitude ?? 76.2711,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         }}
       >
-        {coords.length > 0 && (
-          <>
-            <Polyline coordinates={coords} strokeWidth={5} strokeColor="blue" />
-            <Marker coordinate={coords[0]} pinColor="green" title="Start" />
-            <Marker
-              coordinate={coords[coords.length - 1]}
-              pinColor="red"
-              title="Latest"
-            />
-          </>
-        )}
+        {location && <Marker coordinate={location} />}
       </MapView>
 
-      <View style={{ padding: 16 }}>
-        <View style={styles.row}>
-          <Text style={{ fontSize: 16, fontWeight: "600" }}>Back To School</Text>
-          <Switch value={isBackToSchool} onValueChange={onToggleBackToSchool} />
+      {/* Controls */}
+      <View style={styles.controls}>
+        {loading ? (
+          <ActivityIndicator size="large" />
+        ) : (
+          <Button
+            title={tracking ? "Stop Tracking" : "Start Tracking"}
+            onPress={toggleTracking}
+            color={tracking ? "red" : undefined}
+          />
+        )}
+
+        <View style={styles.switchRow}>
+          <Text style={{ fontSize: 16 }}>Back to School</Text>
+          <Switch value={backToSchool} onValueChange={handleBackToSchoolChange} />
         </View>
-
-        <Button
-          title={tracking ? "Stop Tracking" : "Start Tracking"}
-          color={tracking ? "orange" : undefined}
-          onPress={tracking ? stopTracking : startTracking}
-        />
-
-        <View style={{ height: 10 }} />
-
-        <Button title="Clear Saved Data" color="red" onPress={clearData} />
-
-        <Text style={{ fontWeight: "700", marginTop: 20 }}>Saved Points</Text>
-
-        <FlatList
-          data={coords}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Text style={{ fontSize: 12 }}>
-                {new Date(item.timestamp).toLocaleString()}
-              </Text>
-              <Text style={{ fontSize: 12 }}>
-                Lat: {item.latitude.toFixed(6)} | Lon: {item.longitude.toFixed(6)}
-              </Text>
-              <Text style={{ fontSize: 12 }}>
-                BackToSchool: {item.isBackToSchool ? "YES" : "NO"}
-              </Text>
-            </View>
-          )}
-        />
       </View>
     </View>
   );
 }
 
-/* -------------------- styles -------------------- */
+// ---------------- STYLES ----------------
+
 const styles = StyleSheet.create({
-  row: {
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+
+  backBtn: {
+    position: "absolute",
+    top: 45,
+    left: 15,
+    zIndex: 10,
+    backgroundColor: "#fff",
+    padding: 6,
+    borderRadius: 20,
+    elevation: 3,
+  },
+
+  map: {
+    height: "50%",
+    width: "100%",
+  },
+
+  controls: {
+    flex: 1,
+    padding: 15,
+    borderTopWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#fafafa",
+  },
+
+  switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
-  },
-  item: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderColor: "#ddd",
+    marginTop: 15,
   },
 });

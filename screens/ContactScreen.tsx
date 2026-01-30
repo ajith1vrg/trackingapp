@@ -1,9 +1,14 @@
 import React from "react";
 import { View, Text, StyleSheet, Linking, ScrollView, TouchableOpacity, Platform, StatusBar } from "react-native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MapView, { Marker } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 
-export default function ContactScreen({ navigation }) {
+type ContactScreenProps = {
+  navigation: NativeStackNavigationProp<any>;
+};
+
+export default function ContactScreen({ navigation }: ContactScreenProps) {
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -15,24 +20,25 @@ export default function ContactScreen({ navigation }) {
         <Ionicons name="person-circle-outline" size={26} color="#000" />
       </View>
 
-      <ScrollView>
+      {/* Scrollable content */}
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Map Section */}
         <MapView
-        style={styles.map}
-        scrollEnabled={false}
-        zoomEnabled={false}
-        initialRegion={{
+          style={styles.map}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          initialRegion={{
             latitude: 13.0387,
             longitude: 77.6485,
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
-        }}
+          }}
         >
-        <Marker
+          <Marker
             coordinate={{ latitude: 13.0387, longitude: 77.6485 }}
             title="Crazy Holidays"
             description="Our Office Location"
-        />
+          />
         </MapView>
 
         {/* Location Section */}
@@ -90,33 +96,37 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     borderBottomWidth: 1,
     borderColor: "#ccc",
-    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 8 : 50, // fix for status bar
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 8 : 50,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#000",
   },
+  scrollContent: {
+    paddingBottom: 20, // extra padding so bottom content is visible
+  },
   map: {
     width: "100%",
-    height: 200,
+    height: 250, // slightly taller for better visibility
   },
   card: {
-    backgroundColor: "#f9f9f9", // light background
+    backgroundColor: "#f9f9f9",
     padding: 16,
-    margin: 10,
+    marginHorizontal: 10,
+    marginTop: 10,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#ccc",
   },
   cardTitle: {
-    fontSize: 18, // reduced a bit
+    fontSize: 18,
     fontWeight: "bold",
     color: "#003399",
     marginBottom: 10,
   },
   cardText: {
-    fontSize: 15, // reduced
+    fontSize: 15,
     color: "#333",
     lineHeight: 22,
   },
